@@ -1,0 +1,182 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>إعلان اليوم</title>
+<meta name="theme-color" content="#0f3d3e">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="إعلان اليوم">
+<link rel="manifest" href="manifest.json">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<link rel="icon" href="icon.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@400;500;700;800&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:#0f3d3e; --card:#f4efe6; --ink:#16302f; --muted:#5f6f6c;
+    --accent:#e8a33d; --line:#ddd5c6; --danger:#b4432f;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  html,body{min-height:100%}
+  body{
+    font-family:"Tajawal",system-ui,sans-serif;background:var(--bg);color:var(--ink);
+    min-height:100dvh;display:flex;flex-direction:column;align-items:center;
+    padding:calc(env(safe-area-inset-top) + 28px) 16px calc(env(safe-area-inset-bottom) + 28px);
+  }
+  .wrap{width:100%;max-width:440px}
+  header{display:flex;align-items:center;justify-content:space-between;color:var(--card);margin-bottom:22px}
+  header h1{font-size:26px;font-weight:800}
+  header .who{font-size:14px;opacity:.75}
+  .card{background:var(--card);border-radius:22px;padding:24px;box-shadow:0 10px 30px rgba(0,0,0,.25)}
+  label{display:block;font-size:14px;font-weight:700;margin:14px 0 6px}
+  input,textarea{
+    width:100%;font:inherit;font-size:17px;padding:13px 14px;border-radius:12px;
+    border:1.5px solid var(--line);background:#fff;color:var(--ink);outline:none
+  }
+  input:focus,textarea:focus{border-color:var(--bg)}
+  input[dir=ltr]{text-align:right}
+  textarea{min-height:140px;resize:vertical;line-height:1.7}
+  button{
+    width:100%;font:inherit;font-size:17px;font-weight:700;padding:14px;border:0;border-radius:12px;
+    background:var(--bg);color:var(--card);margin-top:20px;cursor:pointer
+  }
+  button:disabled{opacity:.6}
+  button.ghost{background:transparent;color:var(--card);border:1.5px solid rgba(244,239,230,.4);margin-top:16px;font-size:15px;padding:11px}
+  .err{color:var(--danger);font-size:14px;margin-top:12px;min-height:20px}
+  .tag{display:inline-block;background:var(--accent);color:var(--ink);font-size:13px;font-weight:700;padding:4px 10px;border-radius:999px;margin-bottom:14px}
+  .content{font-size:21px;line-height:1.9;white-space:pre-wrap;font-weight:500}
+  .meta{font-size:13px;color:var(--muted);margin-top:18px;border-top:1px solid var(--line);padding-top:12px}
+  .admin{margin-top:16px}
+  .admin h2{font-size:17px;margin-bottom:4px}
+  .ok{color:#2c7a4b;font-size:14px;margin-top:10px;min-height:20px}
+  .flash{animation:flash 1.2s ease}
+  @keyframes flash{0%{background:#fff6dd}100%{background:var(--card)}}
+  .hidden{display:none}
+  .sub{color:var(--card);opacity:.7;font-size:15px;margin:-14px 0 22px}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <!-- شاشة الدخول -->
+  <section id="loginView" class="hidden">
+    <header><h1>إعلان اليوم</h1></header>
+    <p class="sub">موقع تجريبي — ادخل بحسابك</p>
+    <form class="card" id="loginForm">
+      <label for="user">اسم المستخدم</label>
+      <input id="user" dir="ltr" autocomplete="username" autocapitalize="none" required>
+      <label for="pass">كلمة المرور</label>
+      <input id="pass" type="password" dir="ltr" autocomplete="current-password" required>
+      <button id="loginBtn" type="submit">دخول</button>
+      <div class="err" id="loginErr"></div>
+    </form>
+  </section>
+
+  <!-- الشاشة الرئيسية -->
+  <section id="mainView" class="hidden">
+    <header>
+      <h1>إعلان اليوم</h1>
+      <span class="who" id="who"></span>
+    </header>
+
+    <div class="card" id="annCard">
+      <span class="tag">📢 الإعلان</span>
+      <div class="content" id="annText">...</div>
+      <div class="meta" id="annMeta"></div>
+    </div>
+
+    <div class="card admin hidden" id="adminBox">
+      <h2>تعديل الإعلان (للمشرف)</h2>
+      <textarea id="annEdit"></textarea>
+      <button id="saveBtn">حفظ ونشر للكل</button>
+      <div class="ok" id="saveMsg"></div>
+    </div>
+
+    <button class="ghost" id="logoutBtn">تسجيل خروج</button>
+  </section>
+
+</div>
+
+<script type="module">
+import { createClient } from "https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm";
+
+// ===== إعدادات الربط =====
+const SUPABASE_URL = "https://knnbzcdglptrusgjuejn.supabase.co";
+const SUPABASE_KEY = "sb_publishable_pEqMeLp1WS-VbSrQaO1DNA_6TohUGLM";
+const EMAIL_DOMAIN = "@mutaba.app";
+// =========================
+
+const sb = createClient(SUPABASE_URL, SUPABASE_KEY);
+const $ = (id) => document.getElementById(id);
+let channel = null;
+
+function fmt(ts){
+  if(!ts) return "";
+  return "آخر تحديث: " + new Date(ts).toLocaleString("ar-SA",{dateStyle:"medium",timeStyle:"short"});
+}
+
+function showAnn(row, animate){
+  $("annText").textContent = row.content || "لا يوجد إعلان حاليًا";
+  $("annMeta").textContent = fmt(row.updated_at);
+  if(animate){
+    const c = $("annCard"); c.classList.remove("flash"); void c.offsetWidth; c.classList.add("flash");
+  }
+}
+
+async function enterApp(session){
+  $("loginView").classList.add("hidden");
+  $("mainView").classList.remove("hidden");
+  $("who").textContent = session.user.email.replace(EMAIL_DOMAIN, "");
+
+  const { data } = await sb.from("announcement").select("*").eq("id",1).single();
+  if(data){ showAnn(data); $("annEdit").value = data.content; }
+
+  const { data: adm } = await sb.from("admins").select("user_id").eq("user_id", session.user.id).maybeSingle();
+  $("adminBox").classList.toggle("hidden", !adm);
+
+  // التحديث المباشر: أي تعديل يوصل للكل فورًا
+  if(channel) sb.removeChannel(channel);
+  channel = sb.channel("ann")
+    .on("postgres_changes", { event:"UPDATE", schema:"public", table:"announcement" },
+        (p) => showAnn(p.new, true))
+    .subscribe();
+}
+
+function showLogin(){
+  if(channel){ sb.removeChannel(channel); channel = null; }
+  $("mainView").classList.add("hidden");
+  $("loginView").classList.remove("hidden");
+}
+
+$("loginForm").addEventListener("submit", async (e) => {
+  e.preventDefault();
+  $("loginErr").textContent = "";
+  $("loginBtn").disabled = true;
+  let u = $("user").value.trim().toLowerCase();
+  if(!u.includes("@")) u += EMAIL_DOMAIN;
+  const { data, error } = await sb.auth.signInWithPassword({ email: u, password: $("pass").value });
+  $("loginBtn").disabled = false;
+  if(error){ $("loginErr").textContent = "اسم المستخدم أو كلمة المرور غلط"; return; }
+  enterApp(data.session);
+});
+
+$("saveBtn").addEventListener("click", async () => {
+  $("saveBtn").disabled = true; $("saveMsg").textContent = "";
+  const { error } = await sb.from("announcement")
+    .update({ content: $("annEdit").value, updated_at: new Date().toISOString() })
+    .eq("id", 1);
+  $("saveBtn").disabled = false;
+  $("saveMsg").style.color = error ? "var(--danger)" : "";
+  $("saveMsg").textContent = error ? "ما انحفظ: " + error.message : "✓ انحفظ ووصل للكل";
+});
+
+$("logoutBtn").addEventListener("click", async () => { await sb.auth.signOut(); showLogin(); });
+
+const { data: { session } } = await sb.auth.getSession();
+session ? enterApp(session) : showLogin();
+</script>
+</body>
+</html>
